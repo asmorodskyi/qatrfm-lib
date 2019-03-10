@@ -1,5 +1,5 @@
-variable "count" {
-    default = "2"
+variable "num_domains" {
+    default = "1"
 }
 
 variable "network" {
@@ -24,8 +24,8 @@ provider "libvirt" {
 }
 
 resource "libvirt_volume" "myvdisk" {
-  name = "qatrfm-vdisk-${var.basename}-${count.index}.qcow2"
-  count = "${var.count}"
+  name = "qatrfm-vdisk-${var.basename}-${num_domains.index}.qcow2"
+  count = "${var.num_domains}"
   pool = "default"
   source = "${var.image}"
   format = "qcow2"
@@ -40,10 +40,10 @@ resource "libvirt_network" "my_net" {
 }
 
 resource "libvirt_domain" "domain-sle" {
-  name = "qatrfm-vm-${var.basename}-${count.index}"
+  name = "qatrfm-vm-${var.basename}-${num_domains.index}"
   memory = "${var.ram}"
   vcpu = "${var.cores}"
-  count = "${var.count}"
+  count = "${var.num_domains}"
 
   network_interface {
     network_id = "${libvirt_network.my_net.id}"
@@ -51,7 +51,7 @@ resource "libvirt_domain" "domain-sle" {
   }
 
   disk {
-   volume_id = "${libvirt_volume.myvdisk.*.id[count.index]}"
+   volume_id = "${libvirt_volume.myvdisk.*.id[num_domains.index]}"
   }
 
   console {

@@ -33,7 +33,22 @@ def print_version(ctx, param, value):
     ctx.exit()
 
 
-CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
+def check_mandatory_vars(vars):
+    for var in vars:
+        if (var.split("=")[0] == 'image'):
+            return True
+    return False
+
+
+def find_tf_file(dir):
+    for file in os.listdir(dir):
+        if file.endswith(".tf"):
+            return os.path.join(dir, file)
+    return None
+
+
+CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'],
+                        max_content_width=120)
 
 
 @click.command(context_settings=CONTEXT_SETTINGS)
@@ -44,13 +59,9 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
               'comas of the Class(es) in path to be executed.')
 @click.option('--path', '-p', required=True,
               help='Path of the test file.')
-@click.option('--image', '-i', required=True, help='Path to source image.')
-@click.option('--num_domains', '-n', default=1,
-              help='Number of domains to be created. Default=1')
-@click.option('--cores', '-c', default=1, help='Num cores of the domains. '
-              'Default=1')
-@click.option('--ram', '-r', default=1024, help='Ram of the domains in MB. '
-              'Default=1024')
+@click.option('--var', type=str, multiple=True, help='variable to insert '
+              'to the .tf file. It shall be used multiple times for each '
+              'single variable.')
 @click.option('--snapshots', '-s', is_flag=True,
               help='Create snapshots of the domains at the beginning. '
               'This is useful to allow the test revert the domains to their '
@@ -58,21 +69,26 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.option('--no-clean', 'no_clean', is_flag=True,
               help="Don't clean the environment when the tests finish. "
               "This is useful for debug and troubleshooting.")
-def cli(test, path, image, num_domains, cores, ram, snapshots, no_clean):
+def cli(test, path, var, snapshots, no_clean):
     """ Create a terraform environment and run the test(s)"""
 
     logger = QaTrfmLogger.getQatrfmLogger(__name__)
     test_array = test.split(',')
 
     basedir, filename = os.path.split(path)
-    tf_file = None
-    for file in os.listdir(basedir):
-        if file.endswith(".tf"):
-            tf_file = os.path.join(basedir, file)
-    env = TerraformEnv(image=image,
-                       tf_file=tf_file,
-                       num_domains=num_domains,
-                       snapshots=snapshots)
+    tf_file = find_tf_file(basedir)
+    if (tf_file is None):
+        path_tf = os.path.dirname(os.path.realpath(__file__))
+        tf_file = ("{}/config/default.tf".format(path_tf))
+        if not check_mandatory_vars(vars):
+            logger.error("TF Parameter 'image' must be provided:\n"
+                         "  qatrfm ....  --tfvar image=<image_path>")
+            sys.exit(-1)
+    if (not os.path.isfile(tf_file)):
+        logger.error("File {} not found.".format(tf_file))
+        sys.exit(-1)
+
+    env = TerraformEnv(tf_vars=vars, tf_file=tf_file, snapshots=snapshots)
 
     spec = importlib.util.spec_from_file_location(filename, path)
     module = importlib.util.module_from_spec(spec)

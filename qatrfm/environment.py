@@ -34,33 +34,18 @@ class TerraformEnv(object):
     logger = QaTrfmLogger.getQatrfmLogger(__name__)
     BASEDIR = '/root/terraform/'
 
-    def __init__(self, image, tf_file=None, num_domains=1,
-                 cores=1, ram=1024, snapshots=False):
+    def __init__(self, tf_vars, tf_file=None, snapshots=False):
         """Initialize Terraform Environment object."""
-        self.image = image
-        if (not os.path.isfile(self.image)):
-            self.logger.error("Image file {} not found.".format(self.image))
-            sys.exit(-1)
-
-        if (tf_file is None):
-            path = os.path.dirname(os.path.realpath(__file__))
-            self.tf_file = ("{}/config/simple_1net.tf".format(path))
-        else:
-            self.tf_file = tf_file
-
-        if (not os.path.isfile(self.tf_file)):
-            self.logger.error("File {} not found.".format(self.tf_file))
-            sys.exit(-1)
-        self.logger.debug("Terraform TF file: {}".format(self.tf_file))
-        self.num_domains = num_domains
-        self.cores = cores
-        self.ram = ram
+        self.tf_file = tf_file
+        self.tf_vars = self.make_tf_vars_string(tf_vars)
+        sys.exit()
+        self.logger.info("Terraform TF file: {}".format(self.tf_file))
         self.snapshots = snapshots
         letters = string.ascii_lowercase
         self.basename = ''.join(random.choice(letters) for i in range(10))
         self.workdir = self.BASEDIR + self.basename
         os.makedirs(self.workdir)
-        self.logger.debug("Using working directory {}".format(self.workdir))
+        self.logger.info("Using working directory {}".format(self.workdir))
         shutil.copy(self.tf_file, self.workdir + '/env.tf')
         os.chdir(self.workdir)
         self.domains = []
@@ -70,6 +55,13 @@ class TerraformEnv(object):
                           format(self.networks[0]))
         # TODO: check how many networks the user needs and fill this array
         #       accordingly
+
+    @staticmethod
+    def make_tf_vars_string(vars):
+        str = ''
+        for var in vars:
+            str += '-var "{}" '.format(var)
+        return str
 
     @staticmethod
     def get_network():
